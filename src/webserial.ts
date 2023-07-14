@@ -3,7 +3,7 @@ class Transport {
   public left_over = new Uint8Array(0);
   public baudrate = 0;
 
-  constructor(public device: SerialPort) {}
+  constructor(public device: SerialPort, public tracing = false) {}
 
   get_info() {
     const info = this.device.getInfo();
@@ -14,6 +14,30 @@ class Transport {
 
   get_pid() {
     return this.device.getInfo().usbProductId;
+  }
+
+  hexDump(buffer: Uint8Array) {
+    const bufferStr = String.fromCharCode(...[].slice.call(buffer));
+    const BLOCK_SIZE = 16;
+    const lines = [];
+    const hex = "0123456789ABCDEF";
+
+    for (let b = 0; b < bufferStr.length; b += BLOCK_SIZE) {
+      const block = bufferStr.slice(b, Math.min(b + BLOCK_SIZE, bufferStr.length));
+      const addr = "0000" + b.toString(16).slice(-4);
+      let codes = block
+        .split("")
+        .map((ch) => {
+          const code = ch.charCodeAt(0);
+          return " " + hex[(0xf0 & code) >> 4] + hex[0x0f & code];
+        })
+        .join("");
+      codes += "   ".repeat(BLOCK_SIZE - block.length);
+      let chars = block.replace(/[\\x00-\\x1F\\x20]/g, ".");
+      chars += " ".repeat(BLOCK_SIZE - block.length);
+      lines.push(`${addr} ${codes} ${chars}`);
+    }
+    return lines.join("\n");
   }
 
   slip_writer(data: Uint8Array) {
@@ -52,6 +76,10 @@ class Transport {
 
     if (this.device.writable) {
       const writer = this.device.writable.getWriter();
+      if (this.tracing) {
+        console.log("Write bytes");
+        console.log(this.hexDump(out_data));
+      }
       await writer.write(out_data);
       writer.releaseLock();
     }
@@ -148,8 +176,19 @@ class Transport {
       }
       reader.releaseLock();
     }
+
+    if (this.tracing) {
+      console.log("Read bytes");
+      console.log(this.hexDump(packet));
+    }
+
     if (this.slip_reader_enabled) {
-      return this.slip_reader(packet);
+      const slipReaderResult = this.slip_reader(packet);
+      if (this.tracing) {
+        console.log("Slip reader results");
+        console.log(this.hexDump(slipReaderResult));
+      }
+      return slipReaderResult;
     }
     return packet;
   }
@@ -174,6 +213,10 @@ class Transport {
       const { value, done } = await reader.read();
       if (done) {
         throw new Error("Timeout");
+      }
+      if (this.tracing) {
+        console.log("Raw Read bytes");
+        console.log(value);
       }
       return value;
     } finally {
