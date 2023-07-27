@@ -2,7 +2,7 @@ class Transport {
   public slip_reader_enabled = false;
   public left_over = new Uint8Array(0);
   public baudrate = 0;
-  private traceLog: string = "";
+  private traceLog = "";
   private lastTraceTime = Date.now();
 
   constructor(public device: SerialPort, public tracing = false) {}
@@ -35,7 +35,7 @@ class Transport {
     }
   }
 
-  private hexify(s: string, uppercase: boolean = true): string {
+  private hexify(s: string, uppercase = true): string {
     const format_str = uppercase ? "%02X" : "%02x";
     return s
       .split("")

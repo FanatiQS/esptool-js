@@ -106,7 +106,7 @@ traceButton.onclick = async () => {
   if (transport) {
     transport.returnTrace();
   }
-}
+};
 
 resetButton.onclick = async () => {
   if (device === null) {
