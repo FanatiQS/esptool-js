@@ -1,5 +1,6 @@
 const baudrates = document.getElementById("baudrates") as HTMLSelectElement;
 const connectButton = document.getElementById("connectButton") as HTMLButtonElement;
+const traceButton = document.getElementById("copyTraceButton") as HTMLButtonElement;
 const disconnectButton = document.getElementById("disconnectButton") as HTMLButtonElement;
 const resetButton = document.getElementById("resetButton") as HTMLButtonElement;
 const consoleStartButton = document.getElementById("consoleStartButton") as HTMLButtonElement;
@@ -34,6 +35,7 @@ let chip: string = null;
 let esploader: ESPLoader;
 
 disconnectButton.style.display = "none";
+traceButton.style.display = "none";
 eraseButton.style.display = "none";
 consoleStopButton.style.display = "none";
 filesDiv.style.display = "none";
@@ -67,7 +69,7 @@ const espLoaderTerminal = {
 connectButton.onclick = async () => {
   if (device === null) {
     device = await navigator.serial.requestPort({});
-    transport = new Transport(device);
+    transport = new Transport(device, true);
   }
 
   try {
@@ -94,15 +96,22 @@ connectButton.onclick = async () => {
   baudrates.style.display = "none";
   connectButton.style.display = "none";
   disconnectButton.style.display = "initial";
+  traceButton.style.display = "initial";
   eraseButton.style.display = "initial";
   filesDiv.style.display = "initial";
   consoleDiv.style.display = "none";
 };
 
+traceButton.onclick = async () => {
+  if (transport) {
+    transport.returnTrace();
+  }
+}
+
 resetButton.onclick = async () => {
   if (device === null) {
     device = await navigator.serial.requestPort({});
-    transport = new Transport(device);
+    transport = new Transport(device, true);
   }
 
   await transport.setDTR(false);
@@ -197,7 +206,7 @@ let isConsoleClosed = false;
 consoleStartButton.onclick = async () => {
   if (device === null) {
     device = await navigator.serial.requestPort({});
-    transport = new Transport(device);
+    transport = new Transport(device, true);
   }
   lblConsoleFor.style.display = "block";
   consoleStartButton.style.display = "none";
