@@ -21,6 +21,7 @@ export interface LoaderOptions {
   terminal?: IEspLoaderTerminal;
   romBaudrate: number;
   debugLogging?: boolean;
+  enableTracing: boolean;
 }
 
 async function magic2Chip(magic: number): Promise<ROM | null> {
@@ -137,8 +138,12 @@ export class ESPLoader {
       this.terminal = options.terminal;
       this.terminal.clean();
     }
-    if (options.debugLogging) {
+    if (typeof options.debugLogging !== "undefined") {
       this.debugLogging = options.debugLogging;
+    }
+
+    if (typeof options.enableTracing !== "undefined") {
+      this.transport.tracing = options.enableTracing;
     }
 
     this.info("esptool.js");
@@ -238,6 +243,14 @@ export class ESPLoader {
     timeout = 3000,
   ): Promise<[number, Uint8Array]> {
     if (op != null) {
+      if (this.transport.tracing) {
+        this.transport.trace(
+          `command op:0x${op.toString(16).padStart(2, "0")} data len=${data.length} wait_response=${waitResponse ? 1 : 0} timeout=${(
+            timeout / 1000
+          ).toFixed(3)} data=${this.transport.hexConvert(data)}`,
+        );
+      }
+
       const pkt = new Uint8Array(8 + data.length);
       pkt[0] = 0x00;
       pkt[1] = op;

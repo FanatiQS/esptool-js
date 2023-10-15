@@ -18,10 +18,10 @@ class Transport {
     return this.device.getInfo().usbProductId;
   }
 
-  trace(message: Uint8Array) {
+  trace(message: string) {
     const delta = Date.now() - this.lastTraceTime;
-    const prefix = `TRACE ${delta.toFixed(2)}`;
-    const traceMessage = `${prefix} ${this.hexConvert(message)}`;
+    const prefix = `TRACE ${delta.toFixed(3)}`;
+    const traceMessage = `${prefix} ${message}`;
     console.log(traceMessage);
     this.traceLog += traceMessage + "\n";
   }
@@ -106,7 +106,7 @@ class Transport {
       const writer = this.device.writable.getWriter();
       if (this.tracing) {
         console.log("Write bytes");
-        this.trace(out_data);
+        this.trace(`Write ${out_data.length} bytes: ${this.hexConvert(out_data)}`);
       }
       await writer.write(out_data);
       writer.releaseLock();
@@ -207,14 +207,14 @@ class Transport {
 
     if (this.tracing) {
       console.log("Read bytes");
-      this.trace(packet);
+      this.trace(`Read ${packet.length} bytes: ${this.hexConvert(packet)}`);
     }
 
     if (this.slip_reader_enabled) {
       const slipReaderResult = this.slip_reader(packet);
       if (this.tracing) {
         console.log("Slip reader results");
-        this.trace(slipReaderResult);
+        this.trace(`Read ${slipReaderResult.length} bytes: ${this.hexConvert(slipReaderResult)}`);
       }
       return slipReaderResult;
     }
@@ -244,7 +244,7 @@ class Transport {
       }
       if (this.tracing) {
         console.log("Raw Read bytes");
-        this.trace(value);
+        this.trace(`Read ${value.length} bytes: ${this.hexConvert(value)}`);
       }
       return value;
     } finally {
