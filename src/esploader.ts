@@ -333,21 +333,14 @@ export class ESPLoader {
   }
 
   /**
-   * Convert short integer to byte array
-   * @param {number} i - Number to convert.
-   * @returns {Uint8Array} Byte array.
-   */
-  _shortToBytearray(i: number) {
-    return new Uint8Array([i & 0xff, (i >> 8) & 0xff]);
-  }
-
-  /**
    * Convert an integer to byte array
    * @param {number} i - Number to convert.
    * @returns {ROM} The chip ROM class related to given magic hex number.
    */
   _intToByteArray(i: number): Uint8Array {
-    return new Uint8Array([i & 0xff, (i >> 8) & 0xff, (i >> 16) & 0xff, (i >> 24) & 0xff]);
+    const arr = new Uint8Array(4);
+    new DataView(arr.buffer).setUint32(0, i, true);
+    return arr;
   }
 
   /**
@@ -358,18 +351,6 @@ export class ESPLoader {
    */
   _byteArrayToShort(i: number, j: number) {
     return i | (j >> 8);
-  }
-
-  /**
-   * Convert a byte array to integer.
-   * @param {number} i - Number to convert.
-   * @param {number} j - Number to convert.
-   * @param {number} k - Number to convert.
-   * @param {number} l - Number to convert.
-   * @returns {number} Return a integer number.
-   */
-  _byteArrayToInt(i: number, j: number, k: number, l: number) {
-    return i | (j << 8) | (k << 16) | (l << 24);
   }
 
   /**
@@ -447,7 +428,7 @@ export class ESPLoader {
       const p = await this.transport.read(timeout);
       const resp = p[0];
       const opRet = p[1];
-      const val = this._byteArrayToInt(p[4], p[5], p[6], p[7]);
+      const val = new DataView(p.buffer).getUint32(4, true);
       const data = p.slice(8);
       if (resp == 1) {
         if (op == null || opRet == op) {
@@ -481,17 +462,10 @@ export class ESPLoader {
       const pkt = new Uint8Array(8 + data.length);
       pkt[0] = 0x00;
       pkt[1] = op;
-      pkt[2] = this._shortToBytearray(data.length)[0];
-      pkt[3] = this._shortToBytearray(data.length)[1];
-      pkt[4] = this._intToByteArray(chk)[0];
-      pkt[5] = this._intToByteArray(chk)[1];
-      pkt[6] = this._intToByteArray(chk)[2];
-      pkt[7] = this._intToByteArray(chk)[3];
-
-      let i;
-      for (i = 0; i < data.length; i++) {
-        pkt[8 + i] = data[i];
-      }
+      const view = new DataView(pkt.buffer);
+      view.setUint16(2, data.length);
+      view.setUint32(4, chk);
+      pkt.set(data, 8);
       await this.transport.write(pkt);
     }
 
@@ -509,7 +483,8 @@ export class ESPLoader {
    * @returns {number} - Command number value
    */
   async readReg(addr: number, timeout = 3000) {
-    const pkt = this._intToByteArray(addr);
+    const pkt = new Uint8Array(4);
+    new DataView(pkt.buffer).setUint32(0, addr, true);
     const val = await this.command(this.ESP_READ_REG, pkt, undefined, undefined, timeout);
     return val[0];
   }
@@ -523,15 +498,21 @@ export class ESPLoader {
    * @param {number} delayAfterUs Delay after previous delay
    */
   async writeReg(addr: number, value: number, mask = 0xffffffff, delayUs = 0, delayAfterUs = 0) {
-    let pkt = this._appendArray(this._intToByteArray(addr), this._intToByteArray(value));
-    pkt = this._appendArray(pkt, this._intToByteArray(mask));
-    pkt = this._appendArray(pkt, this._intToByteArray(delayUs));
+	let pkt = new Uint8Array(32);
+    const view = new DataView(pkt.buffer);
+    view.setUint32(0, addr, true);
+    view.setUint32(4, value, true);
+    view.setUint32(8, mask, true);
+    view.setUint32(12, delayUs, true);
 
     if (delayAfterUs > 0) {
-      pkt = this._appendArray(pkt, this._intToByteArray(this.chip.UART_DATE_REG_ADDR));
-      pkt = this._appendArray(pkt, this._intToByteArray(0));
-      pkt = this._appendArray(pkt, this._intToByteArray(0));
-      pkt = this._appendArray(pkt, this._intToByteArray(delayAfterUs));
+      view.setUint32(16, this.chip.UART_DATE_REG_ADDR, true);
+      view.setUint32(20, 0, true);
+      view.setUint32(24, 0, true);
+      view.setUint32(28, delayAfterUs, true);
+    }
+    else {
+      pkt = pkt.slice(0, 16);
     }
 
     await this.checkCommand("write target memory", this.ESP_WRITE_REG, pkt);
@@ -703,9 +684,12 @@ export class ESPLoader {
   async memBegin(size: number, blocks: number, blocksize: number, offset: number) {
     /* XXX: Add check to ensure that STUB is not getting overwritten */
     this.debug("mem_begin " + size + " " + blocks + " " + blocksize + " " + offset.toString(16));
-    let pkt = this._appendArray(this._intToByteArray(size), this._intToByteArray(blocks));
-    pkt = this._appendArray(pkt, this._intToByteArray(blocksize));
-    pkt = this._appendArray(pkt, this._intToByteArray(offset));
+	const pkt = new Uint8Array(16);
+	const view = new DataView(pkt.buffer);
+	view.setUint32(0, size, true);
+	view.setUint32(4, blocks, true);
+	view.setUint32(8, blocksize, true);
+	view.setUint32(12, offset, true);
     await this.checkCommand("enter RAM download mode", this.ESP_MEM_BEGIN, pkt);
   }
 
@@ -730,10 +714,13 @@ export class ESPLoader {
    * @param {number} seq Sequence number
    */
   async memBlock(buffer: Uint8Array, seq: number) {
-    let pkt = this._appendArray(this._intToByteArray(buffer.length), this._intToByteArray(seq));
-    pkt = this._appendArray(pkt, this._intToByteArray(0));
-    pkt = this._appendArray(pkt, this._intToByteArray(0));
-    pkt = this._appendArray(pkt, buffer);
+    const pkt = new Uint8Array(16 + buffer.length);
+    const view = new DataView(pkt.buffer);
+    view.setUint32(0, buffer.length, true);
+    view.setUint32(4, seq, true);
+    view.setUint32(8, 0, true);
+    view.setUint32(12, 0, true);
+    pkt.set(buffer, 16);
     const checksum = this.checksum(buffer);
     await this.checkCommand("write to target RAM", this.ESP_MEM_DATA, pkt, checksum);
   }
@@ -744,7 +731,10 @@ export class ESPLoader {
    */
   async memFinish(entrypoint: number) {
     const isEntry = entrypoint === 0 ? 1 : 0;
-    const pkt = this._appendArray(this._intToByteArray(isEntry), this._intToByteArray(entrypoint));
+    const pkt = new Uint8Array(8);
+    const view = new DataView(pkt.buffer);
+    view.setUint32(0, isEntry, true);
+    view.setUint32(4, entrypoint, true);
     await this.checkCommand("leave RAM download mode", this.ESP_MEM_END, pkt, undefined, 50); // XXX: handle non-stub with diff timeout
   }
 
@@ -753,7 +743,8 @@ export class ESPLoader {
    * @param {number} hspiArg -  Argument for SPI attachment
    */
   async flashSpiAttach(hspiArg: number) {
-    const pkt = this._intToByteArray(hspiArg);
+    const pkt = new Uint8Array(4);
+    new DataView(pkt.buffer).setUint32(0, hspiArg, true);
     await this.checkCommand("configure SPI flash pins", this.ESP_SPI_ATTACH, pkt);
   }
 
@@ -1000,7 +991,7 @@ export class ESPLoader {
       }
       let nextReg = SPI_W0_REG;
       for (i = 0; i < data.length - 4; i += 4) {
-        val = this._byteArrayToInt(data[i], data[i + 1], data[i + 2], data[i + 3]);
+        val = new DataView(data.buffer).getUint16(i, true);
         await this.writeReg(nextReg, val);
         nextReg += 4;
       }
