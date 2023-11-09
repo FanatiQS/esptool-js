@@ -773,8 +773,7 @@ export class ESPLoader {
     const numBlocks = Math.floor((size + this.FLASH_WRITE_SIZE - 1) / this.FLASH_WRITE_SIZE);
     const eraseSize = this.chip.getEraseSize(offset, size);
 
-    const d = new Date();
-    const t1 = d.getTime();
+    const t1 = Date.now();
 
     let timeout = 3000;
     if (this.IS_STUB == false) {
@@ -791,7 +790,7 @@ export class ESPLoader {
 
     await this.checkCommand("enter Flash download mode", this.ESP_FLASH_BEGIN, pkt, undefined, timeout);
 
-    const t2 = d.getTime();
+    const t2 = Date.now();
     if (size != 0 && this.IS_STUB == false) {
       this.info("Took " + (t2 - t1) / 1000 + "." + ((t2 - t1) % 1000) + "s to erase flash block");
     }
@@ -809,8 +808,7 @@ export class ESPLoader {
     const numBlocks = Math.floor((compsize + this.FLASH_WRITE_SIZE - 1) / this.FLASH_WRITE_SIZE);
     const eraseBlocks = Math.floor((size + this.FLASH_WRITE_SIZE - 1) / this.FLASH_WRITE_SIZE);
 
-    const d = new Date();
-    const t1 = d.getTime();
+    const t1 = Date.now();
 
     let writeSize, timeout;
     if (this.IS_STUB) {
@@ -1028,8 +1026,7 @@ export class ESPLoader {
    */
   async eraseFlash(): Promise<number | Uint8Array> {
     this.info("Erasing flash (this may take a while)...");
-    let d = new Date();
-    const t1 = d.getTime();
+    const t1 = Date.now();
     const ret = await this.checkCommand(
       "erase flash",
       this.ESP_ERASE_FLASH,
@@ -1037,8 +1034,7 @@ export class ESPLoader {
       undefined,
       this.CHIP_ERASE_TIMEOUT,
     );
-    d = new Date();
-    const t2 = d.getTime();
+    const t2 = Date.now();
     this.info("Chip erase completed successfully in " + (t2 - t1) / 1000 + "s");
     return ret;
   }
@@ -1355,8 +1351,7 @@ export class ESPLoader {
       const totalBytes = image.length;
       if (options.reportProgress) options.reportProgress(i, 0, totalBytes);
 
-      let d = new Date();
-      const t1 = d.getTime();
+      const t1 = Date.now();
 
       let timeout = 5000;
       // Create a decompressor to keep track of the size of uncompressed data
@@ -1405,8 +1400,7 @@ export class ESPLoader {
       if (this.IS_STUB) {
         await this.readReg(this.CHIP_DETECT_MAGIC_REG_ADDR, timeout);
       }
-      d = new Date();
-      const t = d.getTime() - t1;
+      const t = Date.now() - t1;
       if (options.compress) {
         this.info(
           "Wrote " +
